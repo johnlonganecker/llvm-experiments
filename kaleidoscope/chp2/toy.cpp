@@ -8,9 +8,9 @@
 
 namespace helper {
 
-template <class T, class.. Args>
+template <class T, class... Args>
 static
-    typename std::enable_if<!std::is_array<T>::value, std::unique_ptr<T>>::type
+    typename std::enable_if<!std::is_array<T>::value, std::unique_ptr<T> >::type
     make_unique(Args &&... args) {
   return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
 }
@@ -39,7 +39,7 @@ static int gettok() {
   while (isspace(LastChar))
     LastChar = getchar();
 
-  if isalpha(LastChar) {
+  if (isalpha(LastChar)) {
     IdentifierStr = LastChar;
     while (isalnum((LastChar = getchar())))
       IdentifierStr += LastChar;
@@ -58,9 +58,9 @@ static int gettok() {
       NumStr += LastChar;
       LastChar = getchar();
 
-    } while (isdigital(LastChar) || LastChar == '.');
+    } while (isdigit(LastChar) || LastChar == '.');
 
-    NumVal = strtod(NumStr.c_str(), nullptr)
+    NumVal = strtod(NumStr.c_str(), nullptr);
     return tok_number;
   }
 
@@ -115,11 +115,11 @@ public:
 
 class CallExprAST : public ExprAST {
   std::string Callee;
-  std::vector<std::unique_ptr<ExprAST>> Args;
+  std::vector<std::unique_ptr<ExprAST> > Args;
 
 public:
   CallExprAST(const std::string &Callee,
-              std::vector<std::unique_ptr<ExprAST>> Args)
+              std::vector<std::unique_ptr<ExprAST> > Args)
     : Callee(Callee), Args(std::move(Args)) {}
 };
 
@@ -130,11 +130,11 @@ class PrototypeAST {
 
 public:
   PrototypeAST(const std::string &Name, std::vector<std::string> Args)
-    : Name(name), Args(std::move(Args)) {}
+    : Name(Name), Args(std::move(Args)) {}
 };
 
 class FunctionAST {
-  std::union_ptr<PrototypeAST> Proto;
+  std::unique_ptr<PrototypeAST> Proto;
   std::unique_ptr<ExprAST> Body;
 
 public:
@@ -161,20 +161,20 @@ static int GetTokPrecedence() {
 }
 
 std::unique_ptr<ExprAST> LogError(const char *Str) {
-  fprintf(stderr, "LogError: %s\n", Str);
+  fprintf(stderr, "Error: %s\n", Str);
   return nullptr;
 }
 
 std::unique_ptr<PrototypeAST> LogErrorP(const char *Str) {
-  LogError(Str)
+  LogError(Str);
   return nullptr;
 }
 
 static std::unique_ptr<ExprAST> ParseExpression();
 
 static std::unique_ptr<ExprAST> ParseNumberExpr() {
-  auto Result = llvm::make_unique<NumberExprAST>(NumVal);
-  getNextToke();
+  auto Result = helper::make_unique<NumberExprAST>(NumVal);
+  getNextToken();
   return std::move(Result);
 }
 
@@ -191,12 +191,12 @@ static std::unique_ptr<ExprAST> ParseParenExpr() {
 }
 
 static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
-  std::string IdNAme = IdentifierStr;
+  std::string IdName = IdentifierStr;
 
-  getNextToken()
+  getNextToken();
 
   if (CurTok != '(')
-    return llvm::make_unique<VariableExprAST>(IdName);
+    return helper::make_unique<VariableExprAST>(IdName);
 
   getNextToken();
   std::vector<std::unique_ptr<ExprAST>> Args;
@@ -219,7 +219,7 @@ static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
   // eat ')'.
   getNextToken();
 
-  return llvm::make_unique<CallExprAST>(IdName, std::move(Args));
+  return helper::make_unique<CallExprAST>(IdName, std::move(Args));
 }
 
 static std::unique_ptr<ExprAST> ParsePrimary() {
@@ -227,7 +227,7 @@ static std::unique_ptr<ExprAST> ParsePrimary() {
   default:
     return LogError("unknown token when expecting an expression");
   case tok_identifier:
-    return ParseIndentifierExpr();
+    return ParseIdentifierExpr();
   case tok_number:
     return ParseNumberExpr();
   case '(':
@@ -243,8 +243,8 @@ static std::unique_ptr<ExprAST> ParseBinOpRHS(int ExprPrec,
     if (TokPrec < ExprPrec)
       return LHS;
     
-    int BinOp = CurOk;
-    gotNextToken();
+    int BinOp = CurTok;
+    getNextToken();
 
     auto RHS = ParsePrimary();
 
@@ -252,13 +252,13 @@ static std::unique_ptr<ExprAST> ParseBinOpRHS(int ExprPrec,
       return nullptr;
 
     int NextPrec = GetTokPrecedence();
-    if (TokPrec < NextPrex) {
+    if (TokPrec < NextPrec) {
       RHS = ParseBinOpRHS(TokPrec+1, std::move(RHS));
       if (!RHS)
         return nullptr; 
     }
 
-    LHS = llvm::make_unique<BinaryExprAST>(BinOp, std::move(LHS),
+    LHS = helper::make_unique<BinaryExprAST>(BinOp, std::move(LHS),
                                            std::move(RHS));
 
   }
@@ -272,7 +272,7 @@ static std::unique_ptr<ExprAST> ParseExpression() {
   return ParseBinOpRHS(0, std::move(LHS));
 }
 
-static std::unique_ptr<PrototypeAST> ParseProtype() {
+static std::unique_ptr<PrototypeAST> ParsePrototype() {
   if (CurTok != tok_identifier)
     return LogErrorP("Expected function name in prototype");
 
@@ -285,14 +285,14 @@ static std::unique_ptr<PrototypeAST> ParseProtype() {
   // Read the list of argument names
   std::vector<std::string> ArgNames;
   while (getNextToken() == tok_identifier)
-    ArgNames.push_back(IdentifierStr)
+    ArgNames.push_back(IdentifierStr);
   if(CurTok != ')')
     return LogErrorP("Expected ')' in prototype");
 
   // success
   getNextToken();
 
-  return llvm::make_unique<PrototypeAST>(FnName, std::move(ArgNames));
+  return helper::make_unique<PrototypeAST>(FnName, std::move(ArgNames));
 }
 
 static std::unique_ptr<FunctionAST> ParseDefinition() {
@@ -301,19 +301,19 @@ static std::unique_ptr<FunctionAST> ParseDefinition() {
   if(!Proto) return nullptr;
 
   if (auto E = ParseExpression())
-    return llvm::make_unique<FunctionAST>(std::move(Proto), std::move(E));
+    return helper::make_unique<FunctionAST>(std::move(Proto), std::move(E));
   return nullptr;
 }
 
 static std::unique_ptr<FunctionAST> ParseTopLevelExpr() {
   if (auto E = ParseExpression()) {
-    auto Proto = llvm::make_unique<PrototypeAST>("", std::vector<std::string>());
-    return llvm::make_unique<FunctionAST>(std::move(Proto), std::move(E));
+    auto Proto = helper::make_unique<PrototypeAST>("", std::vector<std::string>());
+    return helper::make_unique<FunctionAST>(std::move(Proto), std::move(E));
   }
   return nullptr;
 }
 
-static std:unique_ptr<PrototypeAST> ParseExtern() {
+static std::unique_ptr<PrototypeAST> ParseExtern() {
   getNextToken();
   return ParsePrototype();
 }
@@ -321,7 +321,7 @@ static std:unique_ptr<PrototypeAST> ParseExtern() {
 // Top Level functions
 
 static void HandleDefinition() {
-  if (parseDefinition()) {
+  if (ParseDefinition()) {
     fprintf(stderr, "Parsed a function definition.\n");
   } else {
     getNextToken();
@@ -329,8 +329,8 @@ static void HandleDefinition() {
 }
 
 static void HandleExtern() {
-  if(parsedExtern()) {
-    fprintf(stderr, "handled an extern.\n")
+  if(ParseExtern()) {
+    fprintf(stderr, "handled an extern.\n");
   } else {
     getNextToken();
   }
@@ -338,7 +338,7 @@ static void HandleExtern() {
 
 static void HandleTopLevelExpression() {
   if(ParseTopLevelExpr()) {
-    fprintf(stderr, "Parsed a top-level expr.\n"
+    fprintf(stderr, "Parsed a top-level expr.\n");
   } else {
     getNextToken();
   }
