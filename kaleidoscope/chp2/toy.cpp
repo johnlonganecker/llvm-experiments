@@ -32,7 +32,6 @@ static std::string IdentifierStr;
 static double NumVal;
 
 // Lexer
-
 static int gettok() {
   static int LastChar = ' ';
 
@@ -279,7 +278,7 @@ static std::unique_ptr<PrototypeAST> ParsePrototype() {
   std::string FnName = IdentifierStr;
   getNextToken();
 
-  if(CurTok != ')')
+  if(CurTok != '(')
     return LogErrorP("expected '(' in prototype");
 
   // Read the list of argument names
